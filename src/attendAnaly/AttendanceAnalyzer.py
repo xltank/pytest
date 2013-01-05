@@ -10,13 +10,15 @@ Created on 2012-12-27
 
 import os
 from xlwt import Workbook, Worksheet
-from timeRecMod import UserRecord, DayRecord
+from timeRecMod import *
 from operator import attrgetter
 import Tkinter
 import tkFileDialog
-from Tkinter import StringVar
 import string
 import sys
+
+
+fName = ''
 
 
 def getRecords(logName):
@@ -48,7 +50,7 @@ def orgnizeRecord(lis):
         if(a.userId != curUser.userId):
             curUser = UserRecord(a.userId, a.userName)
             results.append(curUser)
-        dayIndex = string.atoi(a.time[:11].split('/')[2])
+        dayIndex = string.atoi(a.time[:10].split('/')[2])
         if(dayIndex not in curUser.recDict):
             curUser.recDict[dayIndex] = [a.time]
         else:
@@ -89,9 +91,9 @@ def genTotalSheet(lis):
                             offTime = times[0]
 
                 if(onTime):
-                    onTime = onTime.split(' ').pop()
+                    onTime = onTime.split(' ').pop()[:5]
                 if(offTime):
-                    offTime = offTime.split(' ').pop()
+                    offTime = offTime.split(' ').pop()[:5]
                 sheet1.write(rowNum, colNum, onTime)
                 sheet1.write(rowNum + 1, colNum, offTime)
 
@@ -102,18 +104,38 @@ def genTotalSheet(lis):
 
 
 def startUp():
-    f = tkFileDialog.askopenfile()
-    srcFile = f.name
-    os.chdir(os.path.split(unicode(srcFile))[0])
-
-    records = orgnizeRecord(getRecords(srcFile))
+    if(workday.get() < 0 or workday.get() > 31):
+        print 'invalid workday number'
+        return
+    if(not fName):
+        print 'please select a file'
+        return
+    
+    os.chdir(os.path.split(unicode(fName))[0])
+    records = orgnizeRecord(getRecords(fName))
     setLog('User Num: ' + str(len(records)))
     genTotalSheet(records)
 
 
+def getFile():
+    try:
+        f = tkFileDialog.askopenfile()
+    except Exception, e:
+        print e
+    global fName
+    fName = f.name
+    
+
 def setLog(msg):
     print msg
     labelText.set(labelText.get() + msg + '\n')
+
+
+def workdayChanged(*args):
+#    print args
+    print workday
+
+
 
 
 reload(sys)
@@ -131,11 +153,23 @@ titles = (userIdTitle, nameTitle) + tuple(range(1, dayNum + 1))
 stage = Tkinter.Tk()
 stage.title('xuli')
 stage.geometry('300x300')
-btn = Tkinter.Button(stage, text='选择文件', command=startUp)
-btn.pack()
-labelText = StringVar()
+
+btnBrowse = Tkinter.Button(stage, text='选择文件', command=getFile)
+btnBrowse.pack()
+
+btnStart = Tkinter.Button(stage, text='开始', command=startUp)
+btnStart.pack()
+
+lbWorkday = Tkinter.Entry(stage, text='本月工作天数: ')
+lbWorkday['state'] = 'readonly'
+lbWorkday.pack()
+
+workday = Tkinter.IntVar()
+workdayInput = Tkinter.Entry(stage, textvariable=workday)
+workday.trace('w', workdayChanged)
+workdayInput.pack()
+
+labelText = Tkinter.StringVar()
 label = Tkinter.Label(stage, textvariable=labelText, width='300', justify='left', anchor='w')
 label.pack()
 Tkinter.mainloop()
-
-

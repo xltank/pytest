@@ -16,6 +16,9 @@ class UserRecord(object):
         self.userId = uId
         self.userName = userName
         self.recDict = dict()
+        self.late = 0
+        self.early = 0
+        self.totalTime = 0
         
         
         
