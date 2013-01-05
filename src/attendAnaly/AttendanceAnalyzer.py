@@ -11,33 +11,34 @@ Created on 2012-12-27
 import os
 from xlwt import Workbook, Worksheet
 from timeRecMod import UserRecord, DayRecord
-from xlwt.Workbook import Workbook
 from operator import attrgetter
 import Tkinter
 import tkFileDialog
 from Tkinter import StringVar
+import string
+import sys
 
 
 def getRecords(logName):
     if(not os.path.exists(logName)):
-        setLog(logName+' not exists!')
+        setLog(logName + ' not exists!')
         return
-    
+
     results = []
     f = open(logName, 'r')
     for r in f:
-        if(unicode(r).count(monthStr)  > 0):
-            recTuple = fromString(unicode(r))
-            results.append(DayRecord(recTuple[0],recTuple[1],recTuple[2],recTuple[3]))
-    setLog('all records num: '+str(len(results)))
+        if(r.count(monthStr) > 0):
+            recTuple = fromString(r)
+            results.append(DayRecord(recTuple[0], recTuple[1], recTuple[2], recTuple[3]))
+    setLog('all records num: ' + str(len(results)))
     results.sort(key=attrgetter('userId'), reverse=False)
     return results
-    
-    
+
+
 def fromString(s):
-    s = s.strip().replace('  ', '')
-    lis = unicode(s).split('\t')
-    return lis[0], lis[2], lis[3], lis[6]
+    s = s.strip()
+    lis = s.split('\t')
+    return lis[0], lis[2], unicode(lis[3]), lis[6]
 
 
 def orgnizeRecord(lis):
@@ -47,55 +48,55 @@ def orgnizeRecord(lis):
         if(a.userId != curUser.userId):
             curUser = UserRecord(a.userId, a.userName)
             results.append(curUser)
-        dayIndex = a.time.split(' ')[0].split('/')[2]
+        dayIndex = string.atoi(a.time[:11].split('/')[2])
         if(dayIndex not in curUser.recDict):
             curUser.recDict[dayIndex] = [a.time]
         else:
             curUser.recDict[dayIndex].append(a.time)
-    
+
     results.sort(key=attrgetter('userId'), reverse=False)
     return results
-                
+
 
 def genTotalSheet(lis):
     wb = Workbook(encoding='gbk')
     sheet1 = wb.add_sheet(totalSheetName, True)
     rowNum = 0
-    for i, s in enumerate(titles): # write header
+    for i, s in enumerate(titles):  # write header
         sheet1.write(0, i, str(s))
-    rowNum +=1
-    
+    rowNum += 1
+
     for a in lis:
         for colNum, colName in enumerate(titles):
             if(colNum == 0):
-                sheet1.write_merge(rowNum, rowNum+1, colNum, colNum, a.userId)
+                sheet1.write_merge(rowNum, rowNum + 1, colNum, colNum, a.userId)
             elif(colNum == 1):
-                sheet1.write_merge(rowNum, rowNum+1, colNum, colNum, a.userName)
+                sheet1.write_merge(rowNum, rowNum + 1, colNum, colNum, a.userName)
             else:
                 onTime = ''
                 offTime = ''
-                if(str(colName) in a.recDict):
-                    times = a.recDict[str(colName)]
+                if(colNum in a.recDict):
+                    times = a.recDict[colNum]
                     if(len(times) >= 2):
                         if(len(times) > 2):
-                            setLog('!! ' + a.userName+' '+str(times))
+                            setLog('!! ' + a.userName + ' ' + str(times))
                         onTime = times[0]
-                        offTime = times[len(times)-1]
+                        offTime = times[len(times) - 1]
                     elif(len(times) == 1):
                         if(times[0].split(' ')[1] < divider):
                             onTime = times[0]
                         else:
                             offTime = times[0]
-                            
+
                 if(onTime):
-                    onTime = onTime.split(' ')[1]
+                    onTime = onTime.split(' ').pop()
                 if(offTime):
-                    offTime = offTime.split(' ')[1]
+                    offTime = offTime.split(' ').pop()
                 sheet1.write(rowNum, colNum, onTime)
-                sheet1.write(rowNum+1, colNum, offTime)
-        
+                sheet1.write(rowNum + 1, colNum, offTime)
+
         rowNum += 2
-    
+
 #    if(not os.path.exists('result.xls')):
     wb.save('result.xls')
 
@@ -104,16 +105,19 @@ def startUp():
     f = tkFileDialog.askopenfile()
     srcFile = f.name
     os.chdir(os.path.split(unicode(srcFile))[0])
-    
+
     records = orgnizeRecord(getRecords(srcFile))
-    setLog('User Num: '+str(len(records)))
+    setLog('User Num: ' + str(len(records)))
     genTotalSheet(records)
-    
+
 
 def setLog(msg):
     print msg
-    labelText.set(labelText.get() + msg+'\n')
+    labelText.set(labelText.get() + msg + '\n')
 
+
+reload(sys)
+sys.setdefaultencoding('gbk')
 
 monthStr = '2012/11/'
 userIdTitle = u'±àºÅ'
@@ -122,7 +126,7 @@ dayNum = 30
 divider = '12:00'
 totalSheetName = u'¸ÅÀÀ±í'
 
-titles = (userIdTitle, nameTitle) + tuple(range(1, dayNum+1))
+titles = (userIdTitle, nameTitle) + tuple(range(1, dayNum + 1))
 
 stage = Tkinter.Tk()
 stage.title('xuli')
@@ -134,4 +138,4 @@ label = Tkinter.Label(stage, textvariable=labelText, width='300', justify='left'
 label.pack()
 Tkinter.mainloop()
 
-    
+
