@@ -4,7 +4,9 @@ Created on 2012-12-27
 
 @author: VTX
 
-1082    1    33    徐立              1    0    2012/4/9 18:47        
+1082    1    33    徐立              1    0    2012/4/9 9:9        
+or
+1082    1    0000000033    徐立              1    0    2012/04/09 09:09        
 
 '''
 
@@ -24,10 +26,6 @@ fName = ''
 
 
 def getRecords(logName):
-    if(not os.path.exists(logName)):
-        addLog(logName + ' not exists!')
-        return
-
     results = []
     f = open(logName, 'r')
     for r in f:
@@ -63,12 +61,19 @@ def orgnizeRecord(lis):
 
 # lis is UserRecord list
 def genTotalSheet(lis):
+    timeStyle = XFStyle()
+    timeStyle.num_format_str = 'h:mm'
+    
     lateStyle = XFStyle()
-    lateStyle.num_format_str = 'h:mm:ss'
+    lateStyle.num_format_str = 'h:mm'
     lateStyle.font = Font()
+    ### when isLate = false, set colour_index = 0 will still get red font in Excel.
+    lateStyle.font.colour_index = 2
+    
     earlyStyle = XFStyle()
-    earlyStyle.num_format_str = 'h:mm:ss'
+    earlyStyle.num_format_str = 'h:mm'
     earlyStyle.font = Font()
+    earlyStyle.font.colour_index = 5
 
     global wb
     sheet1 = wb.add_sheet(totalSheetName, True)
@@ -94,7 +99,8 @@ def genTotalSheet(lis):
                         onTime = times[0]
                         offTime = times[len(times) - 1]
                     elif(len(times) == 1):
-                        if(times[0].split(' ')[1] < divider):
+                        onlyTime = strToTime(times[0])
+                        if(onlyTime.hour < divider):
                             onTime = times[0]
                         else:
                             offTime = times[0]
@@ -107,17 +113,17 @@ def genTotalSheet(lis):
                 isLate, isEarly = checkTime(onTime, offTime, colName)
                 if(isLate):  # late
                     a.late += 1
-                    lateStyle.font.colour_index = 2
+                    sheet1.write(rowNum, colNum, onTime, lateStyle)
                 else:
-                    lateStyle.font.colour_index = 0
+                    sheet1.write(rowNum, colNum, onTime, timeStyle)
+                    
                 if(isEarly):  # early
                     a.early += 1
-                    earlyStyle.font.colour_index = 5
+                    sheet1.write(rowNum + 1, colNum, offTime, earlyStyle)
                 else:
-                    earlyStyle.font.colour_index = 0
-
-                sheet1.write(rowNum, colNum, onTime, lateStyle)
-                sheet1.write(rowNum + 1, colNum, offTime, earlyStyle)
+                    sheet1.write(rowNum + 1, colNum, offTime, timeStyle)
+                
+                
 
         rowNum += 2
 
@@ -150,7 +156,12 @@ def strToTime(s):
         return ''
     r = s.split()
     y, m, d = r[0].split('/')
-    h, minute, s = r.pop().split(':')
+    t = r.pop().split(':')
+    if(len(t) == 2):
+        h, minute = t
+        s = '00'
+    elif(len(t) == 3):
+        h, minute, s = t
     return datetime(int(y), int(m), int(d), int(h), int(minute), int(s))
 
 
@@ -175,6 +186,7 @@ def getFile():
         print e
     global fName
     fName = f.name
+    fnameText = f.name
 
 
 def addLog(msg):
@@ -195,12 +207,12 @@ sys.setdefaultencoding('gbk')
 monthStr = '2012/11/'
 userIdTitle = u'编号'
 nameTitle = u'姓名'
-dayNum = 30
-divider = '12:00'
+dayNum = 30 # day num for this month, come from user input.
+divider = 12 # mediator for onTime and offTime, hour.
 totalSheetName = u'概览表'
 statisticsSheetName = u'统计表'
-WORKTIME = 9
-WORKSECOND = WORKTIME * 3600
+WORKTIME = 9 # standard worktime, hour.
+WORKSECOND = WORKTIME * 3600 # standart worktime in second
 
 titles = (userIdTitle, nameTitle) + tuple(range(1, dayNum + 1))
 
@@ -210,22 +222,31 @@ stage = Tkinter.Tk()
 stage.title('xuli')
 stage.geometry('300x300')
 
-btnBrowse = Tkinter.Button(stage, text='选择文件', command=getFile)
+btnBrowse = Tkinter.Button(stage, text=u'选择文件', command=getFile)
+#btnBrowse.grid(row = 0, column = 0)
 btnBrowse.pack()
 
-btnStart = Tkinter.Button(stage, text='开始', command=startUp)
-btnStart.pack()
+fnameText = Tkinter.StringVar()
+lbFileName = Tkinter.Label(stage, text=fnameText)
+#lbFileName.grid(row = 0, column = 1)
+lbFileName.pack()
 
-lbWorkday = Tkinter.Entry(stage, text='本月工作天数: ')
-lbWorkday['state'] = 'readonly'
+lbWorkday = Tkinter.Label(stage, text=u'本月工作天数')
+#lbWorkday.grid(row = 1, column = 0)
 lbWorkday.pack()
 
 workday = Tkinter.IntVar()
 workdayInput = Tkinter.Entry(stage, textvariable=workday)
 workday.trace('w', workdayChanged)
+#lbWorkday.grid(row = 1, column = 1)
 workdayInput.pack()
 
 labelText = Tkinter.StringVar()
 label = Tkinter.Label(stage, textvariable=labelText, width='300', justify='left', anchor='w')
 label.pack()
+
+btnStart = Tkinter.Button(stage, text=u'开始', command=startUp)
+btnStart.pack()
+
+
 Tkinter.mainloop()
