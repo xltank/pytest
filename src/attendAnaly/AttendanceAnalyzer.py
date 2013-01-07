@@ -202,7 +202,7 @@ def workdayChanged(*args):
 
 
 reload(sys)
-sys.setdefaultencoding('gbk')
+sys.setdefaultencoding('gbk') # ignore error reminder in PyDev
 
 monthStr = '2012/11/'
 userIdTitle = u'编号'
@@ -220,33 +220,38 @@ wb = Workbook(encoding='gbk')
 
 stage = Tkinter.Tk()
 stage.title('xuli')
-stage.geometry('300x300')
+stage.geometry('500x500')
 
 btnBrowse = Tkinter.Button(stage, text=u'选择文件', command=getFile)
-#btnBrowse.grid(row = 0, column = 0)
-btnBrowse.pack()
+btnBrowse.grid(row = 0, column = 0, sticky='w')
+#btnBrowse.pack()
 
 fnameText = Tkinter.StringVar()
 lbFileName = Tkinter.Label(stage, text=fnameText)
-#lbFileName.grid(row = 0, column = 1)
-lbFileName.pack()
+lbFileName.grid(row = 0, column = 1, sticky='w')
+#lbFileName.pack()
 
 lbWorkday = Tkinter.Label(stage, text=u'本月工作天数')
-#lbWorkday.grid(row = 1, column = 0)
-lbWorkday.pack()
+lbWorkday.grid(row = 1, column = 0, sticky='w')
+#lbWorkday.pack()
 
 workday = Tkinter.IntVar()
-workdayInput = Tkinter.Entry(stage, textvariable=workday)
 workday.trace('w', workdayChanged)
-#lbWorkday.grid(row = 1, column = 1)
-workdayInput.pack()
-
-labelText = Tkinter.StringVar()
-label = Tkinter.Label(stage, textvariable=labelText, width='300', justify='left', anchor='w')
-label.pack()
+workdayInput = Tkinter.Entry(stage, textvariable=workday)
+workdayInput.grid(row = 1, column = 1, sticky='w')
+#workdayInput.pack()
 
 btnStart = Tkinter.Button(stage, text=u'开始', command=startUp)
-btnStart.pack()
+btnStart.grid(row = 2, column = 0, sticky='w')
+#btnStart.pack()
+
+scrollbar = Tkinter.Scrollbar(stage)
+scrollbar.grid(row = 3, column = 1, sticky='ns')
+
+labelText = Tkinter.StringVar()
+label = Tkinter.Label(stage, textvariable=labelText)
+label.grid(row = 3, column = 0, columnspan=2)
+#label.pack()
 
 
-Tkinter.mainloop()
+stage.mainloop()
