@@ -19,9 +19,7 @@ import tkFileDialog
 import sys
 from xlwt.Style import XFStyle
 from datetime import datetime
-from xlwt.Formatting import Font, Pattern
-from xlwt.Worksheet import Worksheet
-from MySQLdb.times import TimeDelta
+from xlwt.Formatting import Font
 import time
 
 
@@ -237,8 +235,16 @@ def addLog(msg):
 #    print workday
 
 
+def getCurMonth():
+    now = time.localtime()
+    theYear = now[0]
+    lastMonth = now[1] - 1 or 12
+    if(lastMonth == 12):
+        theYear = 
+    
 
 
+##############################################
 reload(sys)
 sys.setdefaultencoding('gbk')  # ignore error reminder in PyDev
 
@@ -266,8 +272,7 @@ totalSheetTitles = (userIdTitle, nameTitle) + tuple(range(1, dayNum + 1))
 
 #wb = Workbook(encoding='gbk')
 
-now = datetime.now()
-lastMonth = time.localtime()[1] - 1 or 12
+getCurMonth()
 
 stage = Tkinter.Tk()
 stage.title('Attendance Records Organizer')
