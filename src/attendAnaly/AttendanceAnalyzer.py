@@ -21,6 +21,8 @@ from xlwt.Style import XFStyle
 from datetime import datetime
 from xlwt.Formatting import Font, Pattern
 from xlwt.Worksheet import Worksheet
+from MySQLdb.times import TimeDelta
+import time
 
 
 fName = ''
@@ -31,18 +33,36 @@ def getFile():
         f = tkFileDialog.askopenfile()
     except Exception, e:
         print e
-    global fName
-    fName = f.name
-    fnameText.set(f.name)
+
+    if(f):
+        global fName
+        fName = f.name
+        fnameText.set(f.name)
 
 
 def startUp():
-#    if(workday.get() < 0 or workday.get() > 31):
-#        print 'invalid workday number'
-#        return
     if(not fName):
-        print 'please select a file'
+        addLog('Please select a file!')
         return
+
+    if(not yearIntVar.get()):
+        addLog('Please input year!')
+        return
+
+    if(not monthIntVar.get()):
+        addLog('Please input month!')
+        return
+
+    if(not workdayIntVar.get()):
+        addLog('Please input workday!')
+        return
+
+    if(workdayIntVar.get() < 0 or workdayIntVar.get() > 31):
+        print 'invalid workday number'
+        return
+
+    global monthStr
+    monthStr = str(yearIntVar.get()) + '/' + str(monthIntVar.get()) + '/'
 
     os.chdir(os.path.split(unicode(fName))[0])
     records = orgnizeRecord(getRecords(fName))
@@ -160,13 +180,18 @@ def genTotalSheet(lis):
 
 
 def checkTime(onTime, offTime, date):
-    time1 = strToTime(monthStr + str(date) + ' ' + '10:00:00')
-    time2 = strToTime(monthStr + str(date) + ' ' + '18:00:00')
+    time10Clock = strToTime(monthStr + str(date) + ' ' + '10:00:00')
+    time18Clock = strToTime(monthStr + str(date) + ' ' + '18:00:00')
+    time19Clock = strToTime(monthStr + str(date) + ' ' + '19:00:00')
     islate = False
     isearly = False
-    if((not onTime) or (onTime and (onTime - time1).total_seconds() >= 0)):
+    if((not onTime) or (onTime and (onTime - time10Clock).total_seconds() >= 0)):
         islate = True
-    if((not offTime) or ((offTime and (offTime - time2).total_seconds() < 0) or (onTime and offTime and (offTime - onTime).total_seconds() < WORKSECOND))):
+
+    flag18Clock = offTime and ((offTime - time18Clock).total_seconds() < 0)  # early
+    flag19Clock = offTime and ((offTime - time19Clock).total_seconds() >= 0)  # must not early
+    flag9Hours = onTime and offTime and ((offTime - onTime).total_seconds() < WORKSECOND)  #early
+    if((not offTime) or flag18Clock or (not flag19Clock and flag9Hours)):
         isearly = True
 
     return islate, isearly
@@ -241,6 +266,9 @@ totalSheetTitles = (userIdTitle, nameTitle) + tuple(range(1, dayNum + 1))
 
 #wb = Workbook(encoding='gbk')
 
+now = datetime.now()
+lastMonth = time.localtime()[1] - 1 or 12
+
 stage = Tkinter.Tk()
 stage.title('Attendance Records Organizer')
 stage.geometry('500x500')
@@ -252,19 +280,35 @@ fnameText = Tkinter.StringVar()
 fnameLabel = Tkinter.Label(stage, textvariable=fnameText)
 fnameLabel.grid(row=0, column=1, sticky='w')
 
-#lbWorkday = Tkinter.Label(stage, text=u'本月工作天数:')
-#lbWorkday.grid(row=1, column=0, sticky='w')
+yearLabel = Tkinter.Label(stage, text=u'年：')
+yearLabel.grid(row=1, column=0, sticky='w')
 
-#workday = Tkinter.IntVar()
-#workday.trace('w', workdayChanged)
-#workdayInput = Tkinter.Entry(stage, textvariable=workday)
-#workdayInput.grid(row=1, column=1, sticky='w')
+yearIntVar = Tkinter.IntVar()
+yearIntVar.set(2012)
+yearEntry = Tkinter.Entry(stage, textvariable=yearIntVar)
+yearEntry.grid(row=1, column=1, sticky='w')
+
+monthLabel = Tkinter.Label(stage, text=u'月：')
+monthLabel.grid(row=2, column=0, sticky='w')
+
+monthIntVar = Tkinter.IntVar()
+monthIntVar.set(12)
+monthEntry = Tkinter.Entry(stage, textvariable=monthIntVar)
+monthEntry.grid(row=2, column=1, sticky='w')
+
+workdayLabel = Tkinter.Label(stage, text=u'本月工作天数:')
+workdayLabel.grid(row=3, column=0, sticky='w')
+
+workdayIntVar = Tkinter.IntVar()
+workdayInput = Tkinter.Entry(stage, textvariable=workdayIntVar)
+workdayInput.grid(row=3, column=1, sticky='w')
 
 btnStart = Tkinter.Button(stage, text=u'开始', command=startUp)
-btnStart.grid(row=2, column=0, sticky='w')
+btnStart.grid(row=4, column=0, sticky='w')
 
 msgText = Tkinter.StringVar()
 msgLabel = Tkinter.Label(stage, textvariable=msgText)
-msgLabel.grid(row=3, column=0, columnspan=2, sticky='w')
+msgLabel.grid(row=5, column=0, columnspan=2, sticky='w')
+
 
 stage.mainloop()
