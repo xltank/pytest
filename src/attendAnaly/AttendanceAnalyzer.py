@@ -22,11 +22,12 @@ import sys
 from xlwt.Style import XFStyle
 from datetime import datetime
 from xlwt.Formatting import Font
+from cgitb import text
 
 
 def getFile():
     try:
-        f = tkFileDialog.askopenfile()
+        f = tkFileDialog.askopenfile(filetypes=[('txt', '*.txt')])
     except Exception, e:
         print e
 
@@ -36,7 +37,7 @@ def getFile():
         fnameText.set(sourceFileName)
 
 
-def startUp():
+def grapRecords():
     if(not sourceFileName):
         addLog('Please select a file!')
         return
@@ -157,7 +158,7 @@ def genTotalSheet(lis):
 
         rowNum += 2
 
-    getTargetFileName()
+#    getTargetFileName()
 
     try:
         wb.save(targetFileName)
@@ -182,20 +183,6 @@ def checkTime(onTime, offTime, date):
         isearly = True
 
     return islate, isearly
-
-def genStaticsSheet(lis):
-    """ lis is UserRecord list """
-    sheet2 = wb.add_sheet(STATISTICS_SHEET_NAME, True)
-
-    for i, t in enumerate(statisticsSheetTitles):
-        sheet2.write(0, i, statisticsDict[t])
-
-    row = 1
-    for a in lis:
-        for i, t in enumerate(statisticsSheetTitles):
-            sheet2.write(row, i, a.__getattribute__(t))
-        row += 1
-
 
 
 def strToTime(s):
@@ -243,9 +230,10 @@ def getTargetMonth():
 
 
 def getTargetFileName():
+    """ if 201211.xls exists, use 201211_n.xls """
     getTargetMonth()
-    originName = targetFileName
     global targetFileName
+    originName = targetFileName
     if(os.path.exists(targetFileName)):
         for i in range(1, 100):
             name1, name2 = os.path.splitext(originName)
@@ -254,7 +242,31 @@ def getTargetFileName():
                 break
 
 
-##############################################
+#################
+
+def readxls():
+    try:
+        tkFileDialog.askopenfile(filetypes=[('xls', '*.xls')])
+    except Exception, e:
+        addLog(str(e))
+
+def analyzeExcel():
+    pass
+
+def genStaticsSheet(lis):
+    """ lis is UserRecord list """
+    sheet2 = wb.add_sheet(STATISTICS_SHEET_NAME, True)
+
+    for i, t in enumerate(statisticsSheetTitles):
+        sheet2.write(0, i, statisticsDict[t])
+
+    row = 1
+    for a in lis:
+        for i, t in enumerate(statisticsSheetTitles):
+            sheet2.write(row, i, a.__getattribute__(t))
+        row += 1
+
+#################
 reload(sys)
 sys.setdefaultencoding('gbk')  # ignore error reminder in PyDev
 
@@ -291,44 +303,62 @@ stage = Tkinter.Tk()
 stage.title('Attendance Records Organizer')
 stage.geometry('500x500')
 
-browserButton = Tkinter.Button(stage, text=u'选择文件', command=getFile)
-browserButton.grid(row=0, column=0, sticky='w')
 
-fnameText = Tkinter.StringVar()
-fnameLabel = Tkinter.Label(stage, textvariable=fnameText)
-fnameLabel.grid(row=0, column=1, sticky='w')
-
+#### grap records from .txt
 yearLabel = Tkinter.Label(stage, text=u'年：')
-yearLabel.grid(row=1, column=0, sticky='w')
+yearLabel.grid(row=0, column=0, sticky='w')
 
 yearIntVar = Tkinter.IntVar()
-yearEntry = Tkinter.Entry(stage, textvariable=yearIntVar)
-yearEntry.grid(row=1, column=1, sticky='w')
+yearEntry = Tkinter.Entry(stage, textvariable=yearIntVar, width=5)
+yearEntry.grid(row=0, column=1, sticky='w')
 
 monthLabel = Tkinter.Label(stage, text=u'月：')
-monthLabel.grid(row=2, column=0, sticky='w')
+monthLabel.grid(row=1, column=0, sticky='w')
 
 monthIntVar = Tkinter.IntVar()
-monthEntry = Tkinter.Entry(stage, textvariable=monthIntVar)
-monthEntry.grid(row=2, column=1, sticky='w')
+monthEntry = Tkinter.Entry(stage, textvariable=monthIntVar, width=3)
+monthEntry.grid(row=1, column=1, sticky='w')
 
 workdayLabel = Tkinter.Label(stage, text=u'本月工作天数:')
-workdayLabel.grid(row=3, column=0, sticky='w')
+workdayLabel.grid(row=2, column=0, sticky='w')
 
 workdayIntVar = Tkinter.IntVar()
 workdayIntVar.set(22)
-workdayInput = Tkinter.Entry(stage, textvariable=workdayIntVar)
-workdayInput.grid(row=3, column=1, sticky='w')
+workdayInput = Tkinter.Entry(stage, textvariable=workdayIntVar, width=3)
+workdayInput.grid(row=2, column=1, sticky='w')
 
-btnStart = Tkinter.Button(stage, text=u'提取记录', command=startUp)
-btnStart.grid(row=4, column=0, sticky='w')
+browserButton = Tkinter.Button(stage, text=u'选择文件', command=getFile)
+browserButton.grid(row=3, column=0, sticky='w')
 
-btnAnalyse = Tkinter.Button(stage, text=u'开始统计', command=startUp)
-btnAnalyse.grid(row=5, column=0, sticky='w')
+fnameText = Tkinter.StringVar()
+fnameLabel = Tkinter.Label(stage, textvariable=fnameText)
+fnameLabel.grid(row=3, column=1, sticky='w')
+
+btnStart = Tkinter.Button(stage, text=u'提取记录', command=grapRecords)
+btnStart.grid(row=5, column=1, sticky='w')
+
+
+# divider
+dividerLine = Tkinter.Label(stage, text=str('|\n' * 10))
+dividerLine.grid(row=0, rowspan=6, column=2)
+
+
+#### analyze modified Excel file
+browserButton2 = Tkinter.Button(stage, text=u'选择文件', command=readxls)
+browserButton2.grid(row=0, column=3, sticky='w')
+
+fnameText2 = Tkinter.StringVar()
+fnameLabel2 = Tkinter.Label(stage, textvariable=fnameText2)
+fnameLabel2.grid(row=0, column=4, sticky='w')
+
+btnAnalyse = Tkinter.Button(stage, text=u'开始统计', command=analyzeExcel)
+btnAnalyse.grid(row=1, column=4, sticky='w')
+
 
 msgText = Tkinter.StringVar()
 msgLabel = Tkinter.Label(stage, textvariable=msgText)
-msgLabel.grid(row=6, column=0, columnspan=2, sticky='w')
+msgLabel.grid(row=6, column=0, columnspan=5, sticky='w')
+
 
 guessTargetMonth()
 
