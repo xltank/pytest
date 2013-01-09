@@ -22,7 +22,7 @@ import sys
 from xlwt.Style import XFStyle
 from datetime import datetime
 from xlwt.Formatting import Font
-from cgitb import text
+import xlrd
 
 
 def getFile():
@@ -158,7 +158,10 @@ def genTotalSheet(lis):
 
         rowNum += 2
 
-#    getTargetFileName()
+    getTargetFileName()
+
+    wb.add_sheet(CORRECTION_SHEET_NAME)
+    wb.add_sheet(STATISTICS_SHEET_NAME)
 
     try:
         wb.save(targetFileName)
@@ -241,17 +244,32 @@ def getTargetFileName():
             if(not os.path.exists(targetFileName)):
                 break
 
-
+#===============================================================================
+#TODO: need to write id, name... in correctionSheet and statisticsSheet
+#read totalSheet and correctionSheet then analyze them and write statisticsSheet
 #################
+#===============================================================================
 
 def readxls():
     try:
-        tkFileDialog.askopenfile(filetypes=[('xls', '*.xls')])
+        f = tkFileDialog.askopenfile(filetypes = [('xls', '*.xls')])
     except Exception, e:
         addLog(str(e))
+    if(f):
+        global correctionSheet
+        correctionSheet = xlrd.open_workbook(f.name).sheets()[1]
+        analyzeCorrectionSheet()
 
-def analyzeExcel():
-    pass
+
+def analyzeCorrectionSheet():
+    if(not correctionSheet):
+        addLog('Please select the xls file with correction sheet.')
+        return
+    print correctionSheet.name
+    #row_data = sheet.row_values(0)
+    #cell_value1 = sheet.cell_value(0,1)
+    #cell_value2 = sheet.cell(0,1)
+
 
 def genStaticsSheet(lis):
     """ lis is UserRecord list """
@@ -281,12 +299,15 @@ divider = 12  # mediator for onTime and offTime, hour.
 sourceFileName = None
 targetFileName = None
 TOTAL_SHEET_NAME = u'概览表'
+CORRECTION_SHEET_NAME = u'修正表'
 STATISTICS_SHEET_NAME = u'统计表'
 WORKTIME = 9  # standard worktime, hour.
 WORKSECOND = WORKTIME * 3600  # standart worktime in second
 
+wb = None
 totalSheetTitles = (userIdTitle, nameTitle) + tuple(range(1, dayNum + 1))
-statisticsSheetTitles = ("userName", "late", "early")  #, "ill", "leave", "absent", "annual", "trip")
+correctionSheet = None
+statisticsSheetTitles = ("userName", "late", "early", "ill", "leave", "absent", "annual", "trip")
 statisticsDict = {  "userName": u"姓名",
                     "late" : u"迟到",
                     "early" : u"早退",
@@ -297,7 +318,6 @@ statisticsDict = {  "userName": u"姓名",
                     "trip" : u"出差",
                   }
 
-wb = None
 
 stage = Tkinter.Tk()
 stage.title('Attendance Records Organizer')
@@ -305,21 +325,21 @@ stage.geometry('500x500')
 
 
 #### grap records from .txt
-yearLabel = Tkinter.Label(stage, text=u'年：')
+yearLabel = Tkinter.Label(stage, text = u'年：')
 yearLabel.grid(row=0, column=0, sticky='w')
 
 yearIntVar = Tkinter.IntVar()
 yearEntry = Tkinter.Entry(stage, textvariable=yearIntVar, width=5)
 yearEntry.grid(row=0, column=1, sticky='w')
 
-monthLabel = Tkinter.Label(stage, text=u'月：')
+monthLabel = Tkinter.Label(stage, text = u'月：')
 monthLabel.grid(row=1, column=0, sticky='w')
 
 monthIntVar = Tkinter.IntVar()
 monthEntry = Tkinter.Entry(stage, textvariable=monthIntVar, width=3)
 monthEntry.grid(row=1, column=1, sticky='w')
 
-workdayLabel = Tkinter.Label(stage, text=u'本月工作天数:')
+workdayLabel = Tkinter.Label(stage, text = u'本月工作天数:')
 workdayLabel.grid(row=2, column=0, sticky='w')
 
 workdayIntVar = Tkinter.IntVar()
@@ -327,14 +347,14 @@ workdayIntVar.set(22)
 workdayInput = Tkinter.Entry(stage, textvariable=workdayIntVar, width=3)
 workdayInput.grid(row=2, column=1, sticky='w')
 
-browserButton = Tkinter.Button(stage, text=u'选择文件', command=getFile)
+browserButton = Tkinter.Button(stage, text = u'选择文件', command = getFile)
 browserButton.grid(row=3, column=0, sticky='w')
 
 fnameText = Tkinter.StringVar()
 fnameLabel = Tkinter.Label(stage, textvariable=fnameText)
 fnameLabel.grid(row=3, column=1, sticky='w')
 
-btnStart = Tkinter.Button(stage, text=u'提取记录', command=grapRecords)
+btnStart = Tkinter.Button(stage, text = u'提取记录', command = grapRecords)
 btnStart.grid(row=5, column=1, sticky='w')
 
 
@@ -344,14 +364,14 @@ dividerLine.grid(row=0, rowspan=6, column=2)
 
 
 #### analyze modified Excel file
-browserButton2 = Tkinter.Button(stage, text=u'选择文件', command=readxls)
+browserButton2 = Tkinter.Button(stage, text = u'选择文件', command = readxls)
 browserButton2.grid(row=0, column=3, sticky='w')
 
 fnameText2 = Tkinter.StringVar()
 fnameLabel2 = Tkinter.Label(stage, textvariable=fnameText2)
 fnameLabel2.grid(row=0, column=4, sticky='w')
 
-btnAnalyse = Tkinter.Button(stage, text=u'开始统计', command=analyzeExcel)
+btnAnalyse = Tkinter.Button(stage, text = u'开始统计', command = analyzeCorrectionSheet)
 btnAnalyse.grid(row=1, column=4, sticky='w')
 
 
