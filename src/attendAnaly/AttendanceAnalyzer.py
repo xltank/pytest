@@ -8,6 +8,8 @@ Created on 2012-12-27
 or
 1082    1    0000000033    徐立              1    0    2012/04/09 09:09        
 
+1，每日打卡记录：只有一条，以12:00为界决定是上班还是下班；超过两条，取第一和最后一条。
+2，
 '''
 
 import os
@@ -20,10 +22,6 @@ import sys
 from xlwt.Style import XFStyle
 from datetime import datetime
 from xlwt.Formatting import Font
-import time
-
-
-fName = ''
 
 
 def getFile():
@@ -33,37 +31,24 @@ def getFile():
         print e
 
     if(f):
-        global fName
-        fName = f.name
-        fnameText.set(f.name)
+        global sourceFileName, fnameText
+        sourceFileName = f.name
+        fnameText.set(sourceFileName)
 
 
 def startUp():
-    if(not fName):
+    if(not sourceFileName):
         addLog('Please select a file!')
-        return
-
-    if(not yearIntVar.get()):
-        addLog('Please input year!')
-        return
-
-    if(not monthIntVar.get()):
-        addLog('Please input month!')
-        return
-
-    if(not workdayIntVar.get()):
-        addLog('Please input workday!')
         return
 
     if(workdayIntVar.get() < 0 or workdayIntVar.get() > 31):
         print 'invalid workday number'
         return
 
-    global monthStr
-    monthStr = str(yearIntVar.get()) + '/' + str(monthIntVar.get()) + '/'
+    getTargetMonth()
 
-    os.chdir(os.path.split(unicode(fName))[0])
-    records = orgnizeRecord(getRecords(fName))
+    os.chdir(os.path.split(unicode(sourceFileName))[0])
+    records = orgnizeRecord(getRecords(sourceFileName))
     addLog(str(len(records)) + ' members')
     genTotalSheet(records)
 
@@ -85,8 +70,9 @@ def fromString(s):
     lis = s.split('\t')
     return lis[0], lis[2], unicode(lis[3]), lis[6]
 
-# lis is DayRecord list
+
 def orgnizeRecord(lis):
+    """ lis is DayRecord list """
     results = []
     curUser = UserRecord()
     for a in lis:
@@ -102,8 +88,9 @@ def orgnizeRecord(lis):
     results.sort(key=attrgetter('userId'), reverse=False)
     return results
 
-# lis is UserRecord list
+
 def genTotalSheet(lis):
+    """ lis is UserRecord list """
     global wb
     wb = Workbook(encoding='gbk')
 
@@ -121,7 +108,7 @@ def genTotalSheet(lis):
     earlyStyle.font = Font()
     earlyStyle.font.colour_index = 7
 
-    sheet1 = wb.add_sheet(totalSheetName, True)
+    sheet1 = wb.add_sheet(TOTAL_SHEET_NAME)
     rowNum = 0
     for i, s in enumerate(totalSheetTitles):  # write header
         sheet1.write(0, i, str(s))
@@ -140,7 +127,7 @@ def genTotalSheet(lis):
                     times = a.recDict[colName]
                     if(len(times) >= 2):
                         if(len(times) > 2):
-                            addLog('!记录异常：' + a.userName + ' ' + monthStr + str(colName))
+                            print '! ' + a.userName + ' ' + monthStr + str(colName) + ' 两条以上打卡记录.'
                         onTime = times[0]
                         offTime = times[len(times) - 1]
                     elif(len(times) == 1):
@@ -154,7 +141,7 @@ def genTotalSheet(lis):
                 offTime = strToTime(offTime)
 
                 if(onTime and offTime):
-                    a.totalTime += (offTime - onTime).seconds / 3600  #...
+                    a.totalTime += (offTime - onTime).seconds / 3600
                 isLate, isEarly = checkTime(onTime, offTime, colName)
                 if(isLate):  # late
                     a.late += 1
@@ -168,13 +155,15 @@ def genTotalSheet(lis):
                 else:
                     sheet1.write(rowNum + 1, colNum, offTime, timeStyle)
 
-
-
         rowNum += 2
 
-#    genStaticsSheet(lis) # easier to do by Excel
-#    if(not os.path.exists('result.xls')):
-    wb.save('result.xls')
+    getTargetFileName()
+
+    try:
+        wb.save(targetFileName)
+        addLog('"' + targetFileName + '" is in the same directory of the .txt file.')
+    except IOError:  #IOError: [Errno 13] Permission denied: '***.xls'
+        addLog('please close ' + targetFileName + ' and retry')
 
 
 def checkTime(onTime, offTime, date):
@@ -194,24 +183,23 @@ def checkTime(onTime, offTime, date):
 
     return islate, isearly
 
-# lis is UserRecord list
-#def genStaticsSheet(lis):
-#    global wb
-#    sheet2 = wb.add_sheet(statisticsSheetName, True)
-#
-#    for i, t in enumerate(statisticsSheetTitles):
-#        sheet2.write(0, i, statisticsDict[t])
-#
-#    row = 1
-#    for a in lis:
-#        for i, t in enumerate(statisticsSheetTitles):
-#            sheet2.write(row, i, a.__getattribute__(t))
-#        row += 1
+def genStaticsSheet(lis):
+    """ lis is UserRecord list """
+    sheet2 = wb.add_sheet(STATISTICS_SHEET_NAME, True)
+
+    for i, t in enumerate(statisticsSheetTitles):
+        sheet2.write(0, i, statisticsDict[t])
+
+    row = 1
+    for a in lis:
+        for i, t in enumerate(statisticsSheetTitles):
+            sheet2.write(row, i, a.__getattribute__(t))
+        row += 1
 
 
 
-# s: 2012/4/9 18:47:00, return: datetime(y,m,d,h,minute,s)
 def strToTime(s):
+    """"s: 2012/4/9 18:47:00, return: datetime(y,m,d,h,minute,s) """
     if(not s):
         return ''
     r = s.split()
@@ -230,49 +218,74 @@ def addLog(msg):
     msgText.set(msgText.get() + msg + '\n')
 
 
-#def workdayChanged(*args):
-##    print args
-#    print workday
+def guessTargetMonth():
+    global theYear, theMonth, monthStr
+    now = datetime.now()
+    theYear = now.year
+    theMonth = now.month - 1 or 12
+    if(theMonth == 12):
+        theYear -= 1
+
+    yearIntVar.set(theYear)
+    monthIntVar.set(theMonth)
+    monthStr = str(theYear) + '/' + str(theMonth) + '/'
+    global targetFileName
+    targetFileName = str(theYear) + str(theMonth).center(2) + '.xls'
 
 
-def getCurMonth():
-    now = time.localtime()
-    theYear = now[0]
-    lastMonth = now[1] - 1 or 12
-    if(lastMonth == 12):
-        theYear = 
-    
+def getTargetMonth():
+    global theYear, theMonth, monthStr
+    theYear = yearIntVar.get()
+    theMonth = monthIntVar.get()
+    monthStr = str(theYear) + '/' + str(theMonth) + '/'
+    global targetFileName
+    targetFileName = str(yearIntVar.get()) + str(monthIntVar.get()).center(2) + '.xls'
+
+
+def getTargetFileName():
+    getTargetMonth()
+    originName = targetFileName
+    global targetFileName
+    if(os.path.exists(targetFileName)):
+        for i in range(1, 100):
+            name1, name2 = os.path.splitext(originName)
+            targetFileName = name1 + '_' + str(i) + name2
+            if(not os.path.exists(targetFileName)):
+                break
 
 
 ##############################################
 reload(sys)
 sys.setdefaultencoding('gbk')  # ignore error reminder in PyDev
 
+theYear = 2012
+theMonth = 12
 monthStr = '2012/11/'
 userIdTitle = u'编号'
 nameTitle = u'姓名'
 dayNum = 30  # day num for this month, come from user input.
 divider = 12  # mediator for onTime and offTime, hour.
-totalSheetName = u'概览表'
-statisticsSheetName = u'统计表'
+
+sourceFileName = None
+targetFileName = None
+TOTAL_SHEET_NAME = u'概览表'
+STATISTICS_SHEET_NAME = u'统计表'
 WORKTIME = 9  # standard worktime, hour.
 WORKSECOND = WORKTIME * 3600  # standart worktime in second
 
 totalSheetTitles = (userIdTitle, nameTitle) + tuple(range(1, dayNum + 1))
-#statisticsDict = {  "userName": u"姓名",
-#                    "late" : u"迟到",
-#                    "early" : u"早退",
-#                    "ill" : u"病假",
-#                    "leave" : u"事假",
-#                    "absent" : u"旷工",
-#                    "annual" : u"年假",
-#                    "trip" : u"出差",
-#                  }
-#statisticsSheetTitles = ("userName", "late", "early")  #, "ill", "leave", "absent", "annual", "trip")
+statisticsSheetTitles = ("userName", "late", "early")  #, "ill", "leave", "absent", "annual", "trip")
+statisticsDict = {  "userName": u"姓名",
+                    "late" : u"迟到",
+                    "early" : u"早退",
+                    "ill" : u"病假",
+                    "leave" : u"事假",
+                    "absent" : u"旷工",
+                    "annual" : u"年假",
+                    "trip" : u"出差",
+                  }
 
-#wb = Workbook(encoding='gbk')
-
-getCurMonth()
+wb = None
 
 stage = Tkinter.Tk()
 stage.title('Attendance Records Organizer')
@@ -289,7 +302,6 @@ yearLabel = Tkinter.Label(stage, text=u'年：')
 yearLabel.grid(row=1, column=0, sticky='w')
 
 yearIntVar = Tkinter.IntVar()
-yearIntVar.set(2012)
 yearEntry = Tkinter.Entry(stage, textvariable=yearIntVar)
 yearEntry.grid(row=1, column=1, sticky='w')
 
@@ -297,7 +309,6 @@ monthLabel = Tkinter.Label(stage, text=u'月：')
 monthLabel.grid(row=2, column=0, sticky='w')
 
 monthIntVar = Tkinter.IntVar()
-monthIntVar.set(12)
 monthEntry = Tkinter.Entry(stage, textvariable=monthIntVar)
 monthEntry.grid(row=2, column=1, sticky='w')
 
@@ -305,15 +316,20 @@ workdayLabel = Tkinter.Label(stage, text=u'本月工作天数:')
 workdayLabel.grid(row=3, column=0, sticky='w')
 
 workdayIntVar = Tkinter.IntVar()
+workdayIntVar.set(22)
 workdayInput = Tkinter.Entry(stage, textvariable=workdayIntVar)
 workdayInput.grid(row=3, column=1, sticky='w')
 
-btnStart = Tkinter.Button(stage, text=u'开始', command=startUp)
+btnStart = Tkinter.Button(stage, text=u'提取记录', command=startUp)
 btnStart.grid(row=4, column=0, sticky='w')
+
+btnAnalyse = Tkinter.Button(stage, text=u'开始统计', command=startUp)
+btnAnalyse.grid(row=5, column=0, sticky='w')
 
 msgText = Tkinter.StringVar()
 msgLabel = Tkinter.Label(stage, textvariable=msgText)
-msgLabel.grid(row=5, column=0, columnspan=2, sticky='w')
+msgLabel.grid(row=6, column=0, columnspan=2, sticky='w')
 
+guessTargetMonth()
 
 stage.mainloop()
