@@ -23,6 +23,7 @@ from xlwt.Style import XFStyle
 from datetime import datetime
 from xlwt.Formatting import Font
 import xlrd
+from xlrd.xldate import xldate_as_tuple, xldate_from_datetime_tuple
 
 
 def getFile():
@@ -141,17 +142,17 @@ def genTotalSheet(lis):
                 onTime = strToTime(onTime)
                 offTime = strToTime(offTime)
 
-                if(onTime and offTime):
-                    a.totalTime += (offTime - onTime).seconds / 3600
+#                if(onTime and offTime):
+#                    a.totalTime += (offTime - onTime).seconds / 3600
                 isLate, isEarly = checkTime(onTime, offTime, colName)
                 if(isLate):  # late
-                    a.late += 1
+#                    a.late += 1
                     sheet1.write(rowNum, colNum, onTime, lateStyle)
                 else:
                     sheet1.write(rowNum, colNum, onTime, timeStyle)
 
                 if(isEarly):  # early
-                    a.early += 1
+#                    a.early += 1
                     sheet1.write(rowNum + 1, colNum, offTime, earlyStyle)
                 else:
                     sheet1.write(rowNum + 1, colNum, offTime, timeStyle)
@@ -247,42 +248,100 @@ def getTargetFileName():
 #===============================================================================
 #TODO: need to write id, name... in correctionSheet and statisticsSheet
 #read totalSheet and correctionSheet then analyze them and write statisticsSheet
-#################
 #===============================================================================
 
 def readxls():
     try:
-        f = tkFileDialog.askopenfile(filetypes = [('xls', '*.xls')])
+        f = tkFileDialog.askopenfile(filetypes=[('xls', '*.xls')])
     except Exception, e:
         addLog(str(e))
     if(f):
-        global correctionSheet
-        correctionSheet = xlrd.open_workbook(f.name).sheets()[1]
-        analyzeCorrectionSheet()
+        analyzeSheets(xlrd.open_workbook(f.name))
 
 
-def analyzeCorrectionSheet():
-    if(not correctionSheet):
+def analyzeSheets(wb):
+    if(not wb):
         addLog('Please select the xls file with correction sheet.')
         return
-    print correctionSheet.name
-    #row_data = sheet.row_values(0)
-    #cell_value1 = sheet.cell_value(0,1)
-    #cell_value2 = sheet.cell(0,1)
+#    sheet1, sheet2 = wb.sheet_by_index(0), wb.sheet_by_index(1)
+#    print sheet1.name, sheet2.name
+    parseSheets(wb)
+#    genStaticsSheet(lis)
 
+def parseSheets(wb):
+    sheet1 = wb.sheet_by_index(0)
+    titlesRow = sheet1.row_values(0)
+    rowNum = sheet1.nrows
+    colNum = sheet1.ncols
+    userRecords = []
+    for r in range(1, rowNum, 2):
+        row1_data = sheet1.row_values(r)
+        row2_data = sheet1.row_values(r + 1)
+        userRec = UserRecord()
+        userRec.userId = row1_data[0]
+        userRec.userName = row1_data[1]
+        for c in range(2, colNum):
+            setAttendaceStatus(row1_data[c], row2_data[c], titlesRow[c], userRec)
+
+        userRecords.append(userRec)
+    print len(userRecords)
+
+
+def setAttendaceStatus(cell1, cell2, date, userRec):
+    time10Clock = strToTime(monthStr + str(date) + ' ' + '10:00:00')
+    time18Clock = strToTime(monthStr + str(date) + ' ' + '18:00:00')
+    # if out in morning and back in afternoon, if offTime < 18:30, it's a early
+    time1830Clock = strToTime(monthStr + str(date) + ' ' + '18:30:00')
+    time19Clock = strToTime(monthStr + str(date) + ' ' + '19:00:00')
+    c1 = cell1
+    c2 = cell2
+    if(isinstance(cell1, float)):
+        t1 = xldate_as_tuple(cell1, 0)
+        c1 = datetime(t1[0], t1[1], t1[2], t1[3], t1[4], t1[5])
+        time1Str = c1.strftime('%Y/%m/%d %H:%M:%S')
+    if(isinstance(cell2, float)):
+        t2 = xldate_as_tuple(cell2, 0)
+        c2 = datetime(t2[0], t2[1], t2[2], t2[3], t2[4], t2[5])
+        time2Str = c2.strftime('%Y/%m/%d %H:%M:%S')
+
+    if(isinstance(c1, datetime)):
+        if(isinstance(c2, datetime)):
+            userRec.totalTime += (c2 - c1).seconds / 3600 - 3600  # - 1 hour lunch time
+
+            if((c1 - time10Clock).total_seconds() >= 0):
+                userRec.late += 1
+
+            flag18Clock = c2 and ((c2 - time18Clock).total_seconds() < 0)  # early
+            flag19Clock = c2 and ((c2 - time19Clock).total_seconds() >= 0)  # must not early
+            flag9Hours = c1 and c2 and ((c2 - c1).total_seconds() < WORKSECOND)  #early
+            if((not c2) or flag18Clock or (not flag19Clock and flag9Hours)):
+                userRec.early += 1
+
+            userRec.recDict[date] = [time1Str, time2Str]
+        elif(isinstance(c2, unicode)):
+            if(stateDictCn2En.has_key(c2)):
+                prop = stateDictCn2En[c2]
+                setattr(userRec, prop, getattr(userRec, prop) + 1)
+    elif(isinstance(c1, unicode)):
+        if(stateDictCn2En.has_key(c1)):
+            prop = stateDictCn2En[c1]
+            setattr(userRec, prop, getattr(userRec, prop) + 1)
+        if(c2 and stateDictCn2En.has_key(c2)):
+            prop = stateDictCn2En[c2]
+            setattr(userRec, prop, getattr(userRec, prop) + 1)
+        elif(isinstance(c2, datetime) and prop == STATE_OUT):
+            if((c2 - time1830Clock).total_seconds < 0):
+                userRec.early += 1
+
+
+
+def parseCorrectionSheet(sht):
+    pass
 
 def genStaticsSheet(lis):
     """ lis is UserRecord list """
-    sheet2 = wb.add_sheet(STATISTICS_SHEET_NAME, True)
+    pass
 
-    for i, t in enumerate(statisticsSheetTitles):
-        sheet2.write(0, i, statisticsDict[t])
-
-    row = 1
-    for a in lis:
-        for i, t in enumerate(statisticsSheetTitles):
-            sheet2.write(row, i, a.__getattribute__(t))
-        row += 1
 
 #################
 reload(sys)
@@ -306,18 +365,33 @@ WORKSECOND = WORKTIME * 3600  # standart worktime in second
 
 wb = None
 totalSheetTitles = (userIdTitle, nameTitle) + tuple(range(1, dayNum + 1))
-correctionSheet = None
-statisticsSheetTitles = ("userName", "late", "early", "ill", "leave", "absent", "annual", "trip")
-statisticsDict = {  "userName": u"姓名",
-                    "late" : u"迟到",
-                    "early" : u"早退",
-                    "ill" : u"病假",
-                    "leave" : u"事假",
-                    "absent" : u"旷工",
-                    "annual" : u"年假",
-                    "trip" : u"出差",
-                  }
 
+#STATE_LATE = u"迟到"
+#STATE_EARLY = u"早退"
+STATE_ILL = u"病假"
+STATE_LEAVE = u"事假"
+STATE_ABSENT = u"旷工"
+STATE_ANNUAL = u"年假"
+STATE_TRIP = u"出差"
+STATE_OUT = u"外出"
+STATE_EXCHANGE = u"调休"
+STATE_GAME = u"活动"
+STATE_DEAD = u"丧假"
+STATE_MARRIAGE = u"婚假"
+
+statisticsSheetTitles = ("userName", "late", "early", "ill", "leave", "absent", "annual", "trip")
+stateDictEn2Cn = {  "ill" : STATE_ILL,
+                    "leave" : STATE_LEAVE,
+                    "absent" : STATE_ABSENT,
+                    "annual" : STATE_ANNUAL,
+                    "trip" : STATE_TRIP,
+                    "out" : STATE_OUT,
+                    "exchange" : STATE_EXCHANGE,
+                    "game" : STATE_GAME,
+                    "dead" : STATE_DEAD,
+                    "marriage" : STATE_MARRIAGE
+                  }
+stateDictCn2En = dict(tuple([(stateDictEn2Cn[k], k) for k in stateDictEn2Cn]))
 
 stage = Tkinter.Tk()
 stage.title('Attendance Records Organizer')
@@ -325,21 +399,21 @@ stage.geometry('500x500')
 
 
 #### grap records from .txt
-yearLabel = Tkinter.Label(stage, text = u'年：')
+yearLabel = Tkinter.Label(stage, text=u'年：')
 yearLabel.grid(row=0, column=0, sticky='w')
 
 yearIntVar = Tkinter.IntVar()
 yearEntry = Tkinter.Entry(stage, textvariable=yearIntVar, width=5)
 yearEntry.grid(row=0, column=1, sticky='w')
 
-monthLabel = Tkinter.Label(stage, text = u'月：')
+monthLabel = Tkinter.Label(stage, text=u'月：')
 monthLabel.grid(row=1, column=0, sticky='w')
 
 monthIntVar = Tkinter.IntVar()
 monthEntry = Tkinter.Entry(stage, textvariable=monthIntVar, width=3)
 monthEntry.grid(row=1, column=1, sticky='w')
 
-workdayLabel = Tkinter.Label(stage, text = u'本月工作天数:')
+workdayLabel = Tkinter.Label(stage, text=u'本月工作天数:')
 workdayLabel.grid(row=2, column=0, sticky='w')
 
 workdayIntVar = Tkinter.IntVar()
@@ -347,14 +421,14 @@ workdayIntVar.set(22)
 workdayInput = Tkinter.Entry(stage, textvariable=workdayIntVar, width=3)
 workdayInput.grid(row=2, column=1, sticky='w')
 
-browserButton = Tkinter.Button(stage, text = u'选择文件', command = getFile)
+browserButton = Tkinter.Button(stage, text=u'选择文件', command=getFile)
 browserButton.grid(row=3, column=0, sticky='w')
 
 fnameText = Tkinter.StringVar()
 fnameLabel = Tkinter.Label(stage, textvariable=fnameText)
 fnameLabel.grid(row=3, column=1, sticky='w')
 
-btnStart = Tkinter.Button(stage, text = u'提取记录', command = grapRecords)
+btnStart = Tkinter.Button(stage, text=u'提取记录', command=grapRecords)
 btnStart.grid(row=5, column=1, sticky='w')
 
 
@@ -364,15 +438,15 @@ dividerLine.grid(row=0, rowspan=6, column=2)
 
 
 #### analyze modified Excel file
-browserButton2 = Tkinter.Button(stage, text = u'选择文件', command = readxls)
+browserButton2 = Tkinter.Button(stage, text=u'选择文件', command=readxls)
 browserButton2.grid(row=0, column=3, sticky='w')
 
 fnameText2 = Tkinter.StringVar()
 fnameLabel2 = Tkinter.Label(stage, textvariable=fnameText2)
 fnameLabel2.grid(row=0, column=4, sticky='w')
 
-btnAnalyse = Tkinter.Button(stage, text = u'开始统计', command = analyzeCorrectionSheet)
-btnAnalyse.grid(row=1, column=4, sticky='w')
+#btnAnalyse = Tkinter.Button(stage, text=u'开始统计', command=analyzeCorrectionSheet)
+#btnAnalyse.grid(row=1, column=4, sticky='w')
 
 
 msgText = Tkinter.StringVar()
@@ -383,3 +457,4 @@ msgLabel.grid(row=6, column=0, columnspan=5, sticky='w')
 guessTargetMonth()
 
 stage.mainloop()
+

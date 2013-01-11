@@ -16,10 +16,21 @@ class UserRecord(object):
         self.userId = uId
         self.userName = userName
         self.recDict = dict()  # key: date, value: list of record time
+
         self.late = 0
         self.early = 0
         self.totalTime = 0  # in minutes
 
+        self.ill = 0
+        self.leave = 0
+        self.absent = 0
+        self.annual = 0
+        self.trip = 0
+        self.out = 0
+        self.exchange = 0
+        self.game = 0
+        self.dead = 0
+        self.marriage = 0
 
 
 
