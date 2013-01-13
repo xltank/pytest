@@ -7,9 +7,6 @@ Created on 2012-12-25
 '''
 import MySQLdb
 
-allTables = ''
-allRecords = ''
-
 def showTables():
     if(cursor):
         sql = 'show tables'
@@ -20,16 +17,17 @@ def showTables():
 
 
 #def createTestTable():
-#    cursor.execute('create table test1 (id varchar(20), name varchar(50), description text)')
+#    cursor.execute('create table test (id varchar(20), name varchar(50), description text)')
 
 
 def createDummyRecords():
+    cursor.execute('delete from user')
     for i in range(20):
-        cursor.execute('insert into test values(%s, %s, %s)' % (i, i * 10, i * 100))
+        cursor.execute('insert into user(name, description) values(%s, %s)' % (i * 10, i * 100))
 
 
 def getRecords():
-    cursor.execute('select * from test')
+    cursor.execute('select * from user')
     allRecords = cursor.fetchall()
     print allRecords
 
@@ -40,7 +38,7 @@ un = 'root'
 pwd = 'root'
 db = 'test'
 
-con = MySQLdb.connect(host=host, port=port, user=un, passwd=pwd, db=db)
+con = MySQLdb.connect(host = host, port = port, user = un, passwd = pwd, db = db)
 cursor = con.cursor()
 
 showTables()

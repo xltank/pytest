@@ -24,6 +24,9 @@ from datetime import datetime
 from xlwt.Formatting import Font
 import xlrd
 from xlrd.xldate import xldate_as_tuple, xldate_from_datetime_tuple
+from Tix import ROW
+import xlwt
+from xlutils import copy
 
 
 def getFile():
@@ -70,7 +73,7 @@ def getRecords(logName):
 def fromString(s):
     s = s.strip()
     lis = s.split('\t')
-    return lis[0], lis[2], unicode(lis[3]), lis[6]
+    return lis[0], lis[2], unicode(lis[3].strip()), lis[6]
 
 
 def orgnizeRecord(lis):
@@ -160,9 +163,6 @@ def genTotalSheet(lis):
         rowNum += 2
 
     getTargetFileName()
-
-    wb.add_sheet(CORRECTION_SHEET_NAME)
-    wb.add_sheet(STATISTICS_SHEET_NAME)
 
     try:
         wb.save(targetFileName)
@@ -256,17 +256,14 @@ def readxls():
     except Exception, e:
         addLog(str(e))
     if(f):
-        analyzeSheets(xlrd.open_workbook(f.name))
+        global wb, targetFileName
+        targetFileName = f.name
+        wb = copy.copy(xlrd.open_workbook(f.name))
+        if(not wb):
+            addLog('Please select the xls file with correction sheet.')
+            return
+        parseSheets(wb)
 
-
-def analyzeSheets(wb):
-    if(not wb):
-        addLog('Please select the xls file with correction sheet.')
-        return
-#    sheet1, sheet2 = wb.sheet_by_index(0), wb.sheet_by_index(1)
-#    print sheet1.name, sheet2.name
-    parseSheets(wb)
-#    genStaticsSheet(lis)
 
 def parseSheets(wb):
     sheet1 = wb.sheet_by_index(0)
@@ -284,7 +281,16 @@ def parseSheets(wb):
             setAttendaceStatus(row1_data[c], row2_data[c], titlesRow[c], userRec)
 
         userRecords.append(userRec)
+
     print len(userRecords)
+    genAttendanceSheet(userRecords)
+    genStateSheet(userRecords)
+
+    try:
+        wb.save(targetFileName)
+        addLog('"' + targetFileName + '" is in the same directory of the .txt file.')
+    except IOError: #IOError: [Errno 13] Permission denied: '***.xls'
+        addLog('please close ' + targetFileName + ' and retry')
 
 
 def setAttendaceStatus(cell1, cell2, date, userRec):
@@ -335,12 +341,62 @@ def setAttendaceStatus(cell1, cell2, date, userRec):
 
 
 
-def parseCorrectionSheet(sht):
-    pass
-
-def genStaticsSheet(lis):
+def genAttendanceSheet(lis):
     """ lis is UserRecord list """
-    pass
+    sheet2 = wb.add_sheet(ATTENDANCE_SHEET_NAME, True)
+    titles = ('姓名', '本月工作日数', '本月工作小时数', '平均每日工作时间', '出勤率')
+    row = 0
+    for i, item in enumerate(titles):
+        sheet2.write(row, i, item)
+    row += 1
+    workdays = workdayIntVar.get()
+    workhours = workdays*8
+    lis.sort(key = attrgetter('totalTime'), reverse = True)
+    for u in lis:
+        hours = u.totalTime / 3600
+        sheet2.write(row, 0, u.userName)
+        sheet2.write(row, 1, workdays)
+        sheet2.write(row, 2, round(hours))
+        sheet2.write(row, 3, round(hours / workdays))
+        sheet2.write(row, 4, int(hours / workhours))
+        row += 1
+
+
+def genStateSheet(lis):
+    sheet3 = wb.add_sheet(STATISTICS_SHEET_NAME, True)
+
+    titles = ('姓名', '迟到次数', '姓名', '早退次数', '姓名', '请假次数', '姓名', '请假时长',)
+    for i, item in enumerate(titles):
+        sheet3.write(0, i, item)
+    # late
+    row = 1
+    col = 0
+    lis.sort(cmp = lambda a, b: cmp(a.ill + a.leave, b.ill + b.leave), reverse = True)
+    for u in lis:
+        if(u.late > 0):
+            sheet3.write(row, col, u.userName)
+            sheet3.write(row, col + 1, u.late)
+            row += 1
+    # early
+    row = 1
+    col += 2
+    lis.sort(cmp = lambda a, b: cmp(a.ill + a.leave, b.ill + b.leave), reverse = True)
+    for u in lis:
+        if(u.early > 0):
+            sheet3.write(row, col, u.userName)
+            sheet3.write(row, col + 1, u.early)
+            row += 1
+
+    # ill and leave
+    row = 1
+    col += 2
+    lis.sort(cmp = lambda a, b: cmp(a.ill + a.leave, b.ill + b.leave), reverse = True)
+    for u in lis:
+        if(u.early > 0):
+            sheet3.write(row, col, u.userName)
+            sheet3.write(row, col + 1, u.early)
+            row += 1
+
 
 
 #################
@@ -358,7 +414,7 @@ divider = 12  # mediator for onTime and offTime, hour.
 sourceFileName = None
 targetFileName = None
 TOTAL_SHEET_NAME = u'概览表'
-CORRECTION_SHEET_NAME = u'修正表'
+ATTENDANCE_SHEET_NAME = u'出勤表'
 STATISTICS_SHEET_NAME = u'统计表'
 WORKTIME = 9  # standard worktime, hour.
 WORKSECOND = WORKTIME * 3600  # standart worktime in second
@@ -399,36 +455,28 @@ stage.geometry('500x500')
 
 
 #### grap records from .txt
-yearLabel = Tkinter.Label(stage, text=u'年：')
+yearLabel = Tkinter.Label(stage, text = u'年：')
 yearLabel.grid(row=0, column=0, sticky='w')
 
 yearIntVar = Tkinter.IntVar()
 yearEntry = Tkinter.Entry(stage, textvariable=yearIntVar, width=5)
 yearEntry.grid(row=0, column=1, sticky='w')
 
-monthLabel = Tkinter.Label(stage, text=u'月：')
+monthLabel = Tkinter.Label(stage, text = u'月：')
 monthLabel.grid(row=1, column=0, sticky='w')
 
 monthIntVar = Tkinter.IntVar()
 monthEntry = Tkinter.Entry(stage, textvariable=monthIntVar, width=3)
 monthEntry.grid(row=1, column=1, sticky='w')
 
-workdayLabel = Tkinter.Label(stage, text=u'本月工作天数:')
-workdayLabel.grid(row=2, column=0, sticky='w')
-
-workdayIntVar = Tkinter.IntVar()
-workdayIntVar.set(22)
-workdayInput = Tkinter.Entry(stage, textvariable=workdayIntVar, width=3)
-workdayInput.grid(row=2, column=1, sticky='w')
-
-browserButton = Tkinter.Button(stage, text=u'选择文件', command=getFile)
+browserButton = Tkinter.Button(stage, text = u'选择文件', command = getFile)
 browserButton.grid(row=3, column=0, sticky='w')
 
 fnameText = Tkinter.StringVar()
 fnameLabel = Tkinter.Label(stage, textvariable=fnameText)
 fnameLabel.grid(row=3, column=1, sticky='w')
 
-btnStart = Tkinter.Button(stage, text=u'提取记录', command=grapRecords)
+btnStart = Tkinter.Button(stage, text = u'提取记录', command = grapRecords)
 btnStart.grid(row=5, column=1, sticky='w')
 
 
@@ -438,12 +486,21 @@ dividerLine.grid(row=0, rowspan=6, column=2)
 
 
 #### analyze modified Excel file
-browserButton2 = Tkinter.Button(stage, text=u'选择文件', command=readxls)
-browserButton2.grid(row=0, column=3, sticky='w')
+workdayLabel = Tkinter.Label(stage, text = u'本月工作天数:')
+workdayLabel.grid(row = 0, column = 3, sticky = 'w')
+
+workdayIntVar = Tkinter.IntVar()
+workdayIntVar.set(22)
+workdayInput = Tkinter.Entry(stage, textvariable = workdayIntVar, width = 3)
+workdayInput.grid(row = 0, column = 4, sticky = 'w')
+
+
+browserButton2 = Tkinter.Button(stage, text = u'选择文件', command = readxls)
+browserButton2.grid(row = 1, column = 3, sticky = 'w')
 
 fnameText2 = Tkinter.StringVar()
 fnameLabel2 = Tkinter.Label(stage, textvariable=fnameText2)
-fnameLabel2.grid(row=0, column=4, sticky='w')
+fnameLabel2.grid(row = 1, column = 4, sticky = 'w')
 
 #btnAnalyse = Tkinter.Button(stage, text=u'开始统计', command=analyzeCorrectionSheet)
 #btnAnalyse.grid(row=1, column=4, sticky='w')
