@@ -23,10 +23,8 @@ from xlwt.Style import XFStyle
 from datetime import datetime
 from xlwt.Formatting import Font
 import xlrd
-from xlrd.xldate import xldate_as_tuple, xldate_from_datetime_tuple
-from Tix import ROW
-import xlwt
-from xlutils import copy
+from xlrd.xldate import xldate_as_tuple
+from datetime import time
 
 
 def getFile():
@@ -245,28 +243,26 @@ def getTargetFileName():
             if(not os.path.exists(targetFileName)):
                 break
 
-#===============================================================================
-#TODO: need to write id, name... in correctionSheet and statisticsSheet
-#read totalSheet and correctionSheet then analyze them and write statisticsSheet
-#===============================================================================
 
+##############################
 def readxls():
     try:
-        f = tkFileDialog.askopenfile(filetypes=[('xls', '*.xls')])
+        f = tkFileDialog.askopenfile(filetypes=[('Excel File', '*.xls *.xlsx')])
     except Exception, e:
         addLog(str(e))
     if(f):
-        global wb, targetFileName
-        targetFileName = f.name
-        wb = copy.copy(xlrd.open_workbook(f.name))
-        if(not wb):
+        global targetFileName
+        tmp = os.path.splitext(f.name)
+        targetFileName = tmp[0] + u'_统计表' + tmp[1]
+        bk = xlrd.open_workbook(filename=f.name, encoding_override='gbk')  # xlrd.Book to read data.
+        if(not bk):
             addLog('Please select the xls file with correction sheet.')
             return
-        parseSheets(wb)
+        parseSheets(bk)
 
 
-def parseSheets(wb):
-    sheet1 = wb.sheet_by_index(0)
+def parseSheets(bk):
+    sheet1 = bk.sheet_by_index(0)
     titlesRow = sheet1.row_values(0)
     rowNum = sheet1.nrows
     colNum = sheet1.ncols
@@ -282,32 +278,38 @@ def parseSheets(wb):
 
         userRecords.append(userRec)
 
+#    global wb
+#    wb = copy.copy(bk)  # set to xlwt.WorkBook to write and save.
     print len(userRecords)
+
+    global wb
+    wb = Workbook(encoding='gbk')
     genAttendanceSheet(userRecords)
     genStateSheet(userRecords)
 
     try:
         wb.save(targetFileName)
-        addLog('"' + targetFileName + '" is in the same directory of the .txt file.')
-    except IOError: #IOError: [Errno 13] Permission denied: '***.xls'
+        addLog('"' + targetFileName + '" is in the same directory of the .xls file.')
+    except IOError:  #IOError: [Errno 13] Permission denied: '***.xls'
         addLog('please close ' + targetFileName + ' and retry')
 
 
 def setAttendaceStatus(cell1, cell2, date, userRec):
-    time10Clock = strToTime(monthStr + str(date) + ' ' + '10:00:00')
-    time18Clock = strToTime(monthStr + str(date) + ' ' + '18:00:00')
+    date = str(int(date))  # date is float
+    time10Clock = strToTime(monthStr + date + ' ' + '10:00:00')
+    time18Clock = strToTime(monthStr + date + ' ' + '18:00:00')
     # if out in morning and back in afternoon, if offTime < 18:30, it's a early
-    time1830Clock = strToTime(monthStr + str(date) + ' ' + '18:30:00')
-    time19Clock = strToTime(monthStr + str(date) + ' ' + '19:00:00')
+    time1830Clock = strToTime(monthStr + date + ' ' + '18:30:00')
+    time19Clock = strToTime(monthStr + date + ' ' + '19:00:00')
     c1 = cell1
     c2 = cell2
     if(isinstance(cell1, float)):
         t1 = xldate_as_tuple(cell1, 0)
-        c1 = datetime(t1[0], t1[1], t1[2], t1[3], t1[4], t1[5])
+        c1 = time(t1[3], t1[4], t1[5])
         time1Str = c1.strftime('%Y/%m/%d %H:%M:%S')
     if(isinstance(cell2, float)):
         t2 = xldate_as_tuple(cell2, 0)
-        c2 = datetime(t2[0], t2[1], t2[2], t2[3], t2[4], t2[5])
+        c2 = time(t2[3], t2[4], t2[5])
         time2Str = c2.strftime('%Y/%m/%d %H:%M:%S')
 
     if(isinstance(c1, datetime)):
@@ -350,8 +352,8 @@ def genAttendanceSheet(lis):
         sheet2.write(row, i, item)
     row += 1
     workdays = workdayIntVar.get()
-    workhours = workdays*8
-    lis.sort(key = attrgetter('totalTime'), reverse = True)
+    workhours = workdays * 8
+    lis.sort(key=attrgetter('totalTime'), reverse=True)
     for u in lis:
         hours = u.totalTime / 3600
         sheet2.write(row, 0, u.userName)
@@ -371,7 +373,7 @@ def genStateSheet(lis):
     # late
     row = 1
     col = 0
-    lis.sort(cmp = lambda a, b: cmp(a.ill + a.leave, b.ill + b.leave), reverse = True)
+    lis.sort(cmp=lambda a, b: cmp(a.ill + a.leave, b.ill + b.leave), reverse=True)
     for u in lis:
         if(u.late > 0):
             sheet3.write(row, col, u.userName)
@@ -380,7 +382,7 @@ def genStateSheet(lis):
     # early
     row = 1
     col += 2
-    lis.sort(cmp = lambda a, b: cmp(a.ill + a.leave, b.ill + b.leave), reverse = True)
+    lis.sort(cmp=lambda a, b: cmp(a.ill + a.leave, b.ill + b.leave), reverse=True)
     for u in lis:
         if(u.early > 0):
             sheet3.write(row, col, u.userName)
@@ -390,7 +392,7 @@ def genStateSheet(lis):
     # ill and leave
     row = 1
     col += 2
-    lis.sort(cmp = lambda a, b: cmp(a.ill + a.leave, b.ill + b.leave), reverse = True)
+    lis.sort(cmp=lambda a, b: cmp(a.ill + a.leave, b.ill + b.leave), reverse=True)
     for u in lis:
         if(u.early > 0):
             sheet3.write(row, col, u.userName)
@@ -455,28 +457,28 @@ stage.geometry('500x500')
 
 
 #### grap records from .txt
-yearLabel = Tkinter.Label(stage, text = u'年：')
+yearLabel = Tkinter.Label(stage, text=u'年：')
 yearLabel.grid(row=0, column=0, sticky='w')
 
 yearIntVar = Tkinter.IntVar()
 yearEntry = Tkinter.Entry(stage, textvariable=yearIntVar, width=5)
 yearEntry.grid(row=0, column=1, sticky='w')
 
-monthLabel = Tkinter.Label(stage, text = u'月：')
+monthLabel = Tkinter.Label(stage, text=u'月：')
 monthLabel.grid(row=1, column=0, sticky='w')
 
 monthIntVar = Tkinter.IntVar()
 monthEntry = Tkinter.Entry(stage, textvariable=monthIntVar, width=3)
 monthEntry.grid(row=1, column=1, sticky='w')
 
-browserButton = Tkinter.Button(stage, text = u'选择文件', command = getFile)
+browserButton = Tkinter.Button(stage, text=u'选择文件', command=getFile)
 browserButton.grid(row=3, column=0, sticky='w')
 
 fnameText = Tkinter.StringVar()
 fnameLabel = Tkinter.Label(stage, textvariable=fnameText)
 fnameLabel.grid(row=3, column=1, sticky='w')
 
-btnStart = Tkinter.Button(stage, text = u'提取记录', command = grapRecords)
+btnStart = Tkinter.Button(stage, text=u'提取记录', command=grapRecords)
 btnStart.grid(row=5, column=1, sticky='w')
 
 
@@ -486,21 +488,21 @@ dividerLine.grid(row=0, rowspan=6, column=2)
 
 
 #### analyze modified Excel file
-workdayLabel = Tkinter.Label(stage, text = u'本月工作天数:')
-workdayLabel.grid(row = 0, column = 3, sticky = 'w')
+workdayLabel = Tkinter.Label(stage, text=u'本月工作天数:')
+workdayLabel.grid(row=0, column=3, sticky='w')
 
 workdayIntVar = Tkinter.IntVar()
 workdayIntVar.set(22)
-workdayInput = Tkinter.Entry(stage, textvariable = workdayIntVar, width = 3)
-workdayInput.grid(row = 0, column = 4, sticky = 'w')
+workdayInput = Tkinter.Entry(stage, textvariable=workdayIntVar, width=3)
+workdayInput.grid(row=0, column=4, sticky='w')
 
 
-browserButton2 = Tkinter.Button(stage, text = u'选择文件', command = readxls)
-browserButton2.grid(row = 1, column = 3, sticky = 'w')
+browserButton2 = Tkinter.Button(stage, text=u'选择文件', command=readxls)
+browserButton2.grid(row=1, column=3, sticky='w')
 
 fnameText2 = Tkinter.StringVar()
 fnameLabel2 = Tkinter.Label(stage, textvariable=fnameText2)
-fnameLabel2.grid(row = 1, column = 4, sticky = 'w')
+fnameLabel2.grid(row=1, column=4, sticky='w')
 
 #btnAnalyse = Tkinter.Button(stage, text=u'开始统计', command=analyzeCorrectionSheet)
 #btnAnalyse.grid(row=1, column=4, sticky='w')
