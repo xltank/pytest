@@ -19,7 +19,7 @@ class UserRecord(object):
 
         self.late = 0
         self.early = 0
-        self.totalTime = 0  # in minutes
+        self.totalTime = 0  # in seconds
 
         self.ill = 0
         self.leave = 0
@@ -31,6 +31,4 @@ class UserRecord(object):
         self.game = 0
         self.dead = 0
         self.marriage = 0
-
-
 

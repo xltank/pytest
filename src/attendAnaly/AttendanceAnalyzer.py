@@ -24,7 +24,6 @@ from datetime import datetime
 from xlwt.Formatting import Font
 import xlrd
 from xlrd.xldate import xldate_as_tuple
-from datetime import time
 
 
 def getFile():
@@ -180,7 +179,7 @@ def checkTime(onTime, offTime, date):
 
     flag18Clock = offTime and ((offTime - time18Clock).total_seconds() < 0)  # early
     flag19Clock = offTime and ((offTime - time19Clock).total_seconds() >= 0)  # must not early
-    flag9Hours = onTime and offTime and ((offTime - onTime).total_seconds() < WORKSECOND)  #early
+    flag9Hours = onTime and offTime and ((offTime - onTime).total_seconds() < WORKSECONDS)  #early
     if((not offTime) or flag18Clock or (not flag19Clock and flag9Hours)):
         isearly = True
 
@@ -270,6 +269,7 @@ def parseSheets(bk):
     for r in range(1, rowNum, 2):
         row1_data = sheet1.row_values(r)
         row2_data = sheet1.row_values(r + 1)
+        print row1_data[1]
         userRec = UserRecord()
         userRec.userId = row1_data[0]
         userRec.userName = row1_data[1]
@@ -294,42 +294,49 @@ def parseSheets(bk):
         addLog('please close ' + targetFileName + ' and retry')
 
 
-def setAttendaceStatus(cell1, cell2, date, userRec):
+def setAttendaceStatus(c1, c2, date, userRec):
     date = str(int(date))  # date is float
     time10Clock = strToTime(monthStr + date + ' ' + '10:00:00')
+    time12Clock = strToTime(monthStr + date + ' ' + '12:00:00')
+    time13Clock = strToTime(monthStr + date + ' ' + '13:00:00')
     time18Clock = strToTime(monthStr + date + ' ' + '18:00:00')
     # if out in morning and back in afternoon, if offTime < 18:30, it's a early
     time1830Clock = strToTime(monthStr + date + ' ' + '18:30:00')
     time19Clock = strToTime(monthStr + date + ' ' + '19:00:00')
-    c1 = cell1
-    c2 = cell2
-    if(isinstance(cell1, float)):
-        t1 = xldate_as_tuple(cell1, 0)
-        c1 = time(t1[3], t1[4], t1[5])
-        time1Str = c1.strftime('%Y/%m/%d %H:%M:%S')
-    if(isinstance(cell2, float)):
-        t2 = xldate_as_tuple(cell2, 0)
-        c2 = time(t2[3], t2[4], t2[5])
-        time2Str = c2.strftime('%Y/%m/%d %H:%M:%S')
+    if(isinstance(c1, float)):  # use column date to be compatible with '09:11:11'
+        t1 = xldate_as_tuple(c1, 0)
+        c1 = strToTime(monthStr + date + ' ' + str(t1[3]) + ':' + str(t1[4]) + ':' + str(t1[5]))
+    if(isinstance(c2, float)):
+        t2 = xldate_as_tuple(c2, 0)
+        c2 = strToTime(monthStr + date + ' ' + str(t2[3]) + ':' + str(t2[4]) + ':' + str(t2[5]))
+
+#    if(isinstance(c1, datetime)):
+#        time1Str = c1.strftime('%Y/%m/%d %H:%M:%S')
+#    if(isinstance(c2, datetime)):
+#        time2Str = c2.strftime('%Y/%m/%d %H:%M:%S')
 
     if(isinstance(c1, datetime)):
         if(isinstance(c2, datetime)):
-            userRec.totalTime += (c2 - c1).seconds / 3600 - 3600  # - 1 hour lunch time
+            userRec.totalTime += (c2 - c1).total_seconds() - 3600  # - 1 hour lunch time
 
             if((c1 - time10Clock).total_seconds() >= 0):
                 userRec.late += 1
 
             flag18Clock = c2 and ((c2 - time18Clock).total_seconds() < 0)  # early
             flag19Clock = c2 and ((c2 - time19Clock).total_seconds() >= 0)  # must not early
-            flag9Hours = c1 and c2 and ((c2 - c1).total_seconds() < WORKSECOND)  #early
+            flag9Hours = c1 and c2 and ((c2 - c1).total_seconds() < WORKSECONDS)  #early
             if((not c2) or flag18Clock or (not flag19Clock and flag9Hours)):
                 userRec.early += 1
 
-            userRec.recDict[date] = [time1Str, time2Str]
+#            userRec.recDict[date] = [time1Str, time2Str]
         elif(isinstance(c2, unicode)):
             if(stateDictCn2En.has_key(c2)):
                 prop = stateDictCn2En[c2]
                 setattr(userRec, prop, getattr(userRec, prop) + 1)
+            if(c2 == STATE_GAME):
+                userRec.totalTime += WORKSECONDS_STD
+            else:
+                userRec.totalTime += (time12Clock - c2).total_seconds()
     elif(isinstance(c1, unicode)):
         if(stateDictCn2En.has_key(c1)):
             prop = stateDictCn2En[c1]
@@ -337,16 +344,24 @@ def setAttendaceStatus(cell1, cell2, date, userRec):
         if(c2 and stateDictCn2En.has_key(c2)):
             prop = stateDictCn2En[c2]
             setattr(userRec, prop, getattr(userRec, prop) + 1)
-        elif(isinstance(c2, datetime) and prop == STATE_OUT):
-            if((c2 - time1830Clock).total_seconds < 0):
-                userRec.early += 1
+        elif(isinstance(c2, datetime)):
+            if(prop == STATE_OUT):
+                if((c2 - time1830Clock).total_seconds() < 0):
+                    userRec.early += 1
+
+            userRec.totalTime += (c2 - time13Clock).total_seconds()
+
 
 
 
 def genAttendanceSheet(lis):
     """ lis is UserRecord list """
     sheet2 = wb.add_sheet(ATTENDANCE_SHEET_NAME, True)
-    titles = ('姓名', '本月工作日数', '本月工作小时数', '平均每日工作时间', '出勤率')
+    percentStyle = XFStyle()
+    percentStyle.num_format_str = '0%'
+    integerStyle = XFStyle()
+    integerStyle.num_format_str = '0'
+    titles = ('姓名', '总工作日（天）', '总工时（小时）', '个人总出勤（小时）', '个人日均（小时）', '个人出勤率')
     row = 0
     for i, item in enumerate(titles):
         sheet2.write(row, i, item)
@@ -355,12 +370,13 @@ def genAttendanceSheet(lis):
     workhours = workdays * 8
     lis.sort(key=attrgetter('totalTime'), reverse=True)
     for u in lis:
-        hours = u.totalTime / 3600
+        hours = round(u.totalTime / 3600.0)
         sheet2.write(row, 0, u.userName)
         sheet2.write(row, 1, workdays)
-        sheet2.write(row, 2, round(hours))
-        sheet2.write(row, 3, round(hours / workdays))
-        sheet2.write(row, 4, int(hours / workhours))
+        sheet2.write(row, 2, workhours, integerStyle)
+        sheet2.write(row, 3, hours, integerStyle)
+        sheet2.write(row, 4, hours / workdays, integerStyle)
+        sheet2.write(row, 5, round(hours / workhours, 2), percentStyle)
         row += 1
 
 
@@ -373,7 +389,7 @@ def genStateSheet(lis):
     # late
     row = 1
     col = 0
-    lis.sort(cmp=lambda a, b: cmp(a.ill + a.leave, b.ill + b.leave), reverse=True)
+    lis.sort(key=attrgetter('late'), reverse=True)
     for u in lis:
         if(u.late > 0):
             sheet3.write(row, col, u.userName)
@@ -382,7 +398,7 @@ def genStateSheet(lis):
     # early
     row = 1
     col += 2
-    lis.sort(cmp=lambda a, b: cmp(a.ill + a.leave, b.ill + b.leave), reverse=True)
+    lis.sort(key=attrgetter('early'), reverse=True)
     for u in lis:
         if(u.early > 0):
             sheet3.write(row, col, u.userName)
@@ -394,9 +410,9 @@ def genStateSheet(lis):
     col += 2
     lis.sort(cmp=lambda a, b: cmp(a.ill + a.leave, b.ill + b.leave), reverse=True)
     for u in lis:
-        if(u.early > 0):
+        if(u.ill + u.leave > 0):
             sheet3.write(row, col, u.userName)
-            sheet3.write(row, col + 1, u.early)
+            sheet3.write(row, col + 1, u.ill + u.leave)
             row += 1
 
 
@@ -418,8 +434,9 @@ targetFileName = None
 TOTAL_SHEET_NAME = u'概览表'
 ATTENDANCE_SHEET_NAME = u'出勤表'
 STATISTICS_SHEET_NAME = u'统计表'
-WORKTIME = 9  # standard worktime, hour.
-WORKSECOND = WORKTIME * 3600  # standart worktime in second
+WORKHOURS = 9  # standard worktime, hour.
+WORKSECONDS = WORKHOURS * 3600  # 9 hours worktime in second
+WORKSECONDS_STD = 8 * 3600  # standard worktime in second
 
 wb = None
 totalSheetTitles = (userIdTitle, nameTitle) + tuple(range(1, dayNum + 1))
@@ -458,51 +475,54 @@ stage.geometry('500x500')
 
 #### grap records from .txt
 yearLabel = Tkinter.Label(stage, text=u'年：')
-yearLabel.grid(row=0, column=0, sticky='w')
+yearLabel.grid(row=0, column=0, columnspan=2, sticky='w')
 
 yearIntVar = Tkinter.IntVar()
 yearEntry = Tkinter.Entry(stage, textvariable=yearIntVar, width=5)
-yearEntry.grid(row=0, column=1, sticky='w')
+yearEntry.grid(row=0, column=2, columnspan=2, sticky='w')
 
 monthLabel = Tkinter.Label(stage, text=u'月：')
-monthLabel.grid(row=1, column=0, sticky='w')
+monthLabel.grid(row=1, column=0, columnspan=2, sticky='w')
 
 monthIntVar = Tkinter.IntVar()
 monthEntry = Tkinter.Entry(stage, textvariable=monthIntVar, width=3)
-monthEntry.grid(row=1, column=1, sticky='w')
+monthEntry.grid(row=1, column=2, columnspan=2, sticky='w')
 
-browserButton = Tkinter.Button(stage, text=u'选择文件', command=getFile)
-browserButton.grid(row=3, column=0, sticky='w')
-
-fnameText = Tkinter.StringVar()
-fnameLabel = Tkinter.Label(stage, textvariable=fnameText)
-fnameLabel.grid(row=3, column=1, sticky='w')
-
-btnStart = Tkinter.Button(stage, text=u'提取记录', command=grapRecords)
-btnStart.grid(row=5, column=1, sticky='w')
-
-
-# divider
-dividerLine = Tkinter.Label(stage, text=str('|\n' * 10))
-dividerLine.grid(row=0, rowspan=6, column=2)
-
-
-#### analyze modified Excel file
 workdayLabel = Tkinter.Label(stage, text=u'本月工作天数:')
-workdayLabel.grid(row=0, column=3, sticky='w')
+workdayLabel.grid(row=2, column=0, columnspan=2, sticky='w')
 
 workdayIntVar = Tkinter.IntVar()
 workdayIntVar.set(22)
 workdayInput = Tkinter.Entry(stage, textvariable=workdayIntVar, width=3)
-workdayInput.grid(row=0, column=4, sticky='w')
+workdayInput.grid(row=2, column=2, columnspan=2, sticky='w')
 
 
+hdLine = Tkinter.Label(stage, text=str('-' * 40))
+hdLine.grid(row=3, column=0, columnspan=5)
+
+
+browserButton = Tkinter.Button(stage, text=u'选择文件', command=getFile)
+browserButton.grid(row=4, column=0, sticky='w')
+
+fnameText = Tkinter.StringVar()
+fnameLabel = Tkinter.Label(stage, textvariable=fnameText)
+fnameLabel.grid(row=5, column=0, sticky='w')
+
+btnStart = Tkinter.Button(stage, text=u'提取记录', command=grapRecords)
+btnStart.grid(row=4, column=1, sticky='w')
+
+
+vdLine = Tkinter.Label(stage, text=str('|\n' * 6))
+vdLine.grid(row=4, rowspan=3, column=2)
+
+
+#### analyze modified Excel file
 browserButton2 = Tkinter.Button(stage, text=u'选择文件', command=readxls)
-browserButton2.grid(row=1, column=3, sticky='w')
+browserButton2.grid(row=4, column=3, sticky='w')
 
 fnameText2 = Tkinter.StringVar()
 fnameLabel2 = Tkinter.Label(stage, textvariable=fnameText2)
-fnameLabel2.grid(row=1, column=4, sticky='w')
+fnameLabel2.grid(row=5, column=4, sticky='w')
 
 #btnAnalyse = Tkinter.Button(stage, text=u'开始统计', command=analyzeCorrectionSheet)
 #btnAnalyse.grid(row=1, column=4, sticky='w')
