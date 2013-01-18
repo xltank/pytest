@@ -7,17 +7,19 @@ Created on 2013-1-15
 import web
 
 urls = ('/(\w+)', 'index')
-
-render = web.template.render('templates/')
+#render = web.template.render('templates/')
+app = web.application(urls, globals())
 
 class index:
     def GET(self, name):
-#        return render.index("<em>aaaaa</em>")
-#        i = web.input(name=None)
-        return render.index(name)
+        print name
+        return name
 
+def hello(handler):
+    print handler()
+    return 'Hello ', handler()
 
 
 if __name__ == '__main__':
-    app = web.application(urls, globals())
+    app.add_processor(hello)
     app.run()

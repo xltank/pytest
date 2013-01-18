@@ -4,3 +4,12 @@ $def with(items)
 $for i in items:
 	<li id="t$i.id">$i.name</li>
 </ul>
+
+<form method="post" action="add">
+	<p>
+	<input type="text" name="name"/>
+	<input type="text" name="gender"/>
+	<input type="text" name="description"/>
+	<input type="submit" value="Add"/>
+	</p>
+</form>
