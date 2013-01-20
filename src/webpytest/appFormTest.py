@@ -19,7 +19,8 @@ myform = form.Form(
                                 form.Validator('Must be more than 5', lambda x:int(x) > 5)),
                    form.Textbox('moe'),
                    form.Checkbox('curly'),
-                   form.Dropdown('french', ['mustard', 'fries', 'wine']))
+                   form.Dropdown('french', ['mustard', 'fries', 'wine'])
+                   )
 
 class index:
     def GET(self):

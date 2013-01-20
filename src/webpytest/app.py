@@ -6,20 +6,14 @@ Created on 2013-1-15
 
 import web
 
-urls = ('/(\w+)', 'index')
-#render = web.template.render('templates/')
-app = web.application(urls, globals())
+urls = ('/\w+', 'index')
 
 class index:
-    def GET(self, name):
-        print name
-        return name
-
-def hello(handler):
-    print handler()
-    return 'Hello ', handler()
+    def GET(self):
+        i = web.input()
+        return 'hello ' + i.name
 
 
-if __name__ == '__main__':
-    app.add_processor(hello)
+if(__name__ == '__main__'):
+    app = web.application(urls, globals())
     app.run()

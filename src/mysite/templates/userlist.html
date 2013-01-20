@@ -1,0 +1,25 @@
+$def with(users)
+<html>
+	<head>
+		<title>This is a test homepage.</title>
+	</head>
+	
+	<body>
+		<input type="button" value="Log out" onclick="location.href='logout'">
+		<p/>
+		<table border="1">
+			<tr>
+				<th>ID</th>
+				<th>Name</th>
+				<th>Desc</th>
+			</tr>
+			$for u in users:
+			<tr>
+				<td>$u.id</td>
+				<td>$u.name</td>
+				<td>$u.description</td>
+			</tr>
+		</table>
+	</body>
+
+</html>
