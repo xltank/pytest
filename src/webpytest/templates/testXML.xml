@@ -1,0 +1,5 @@
+$def with(data)
+<?xml version="1.0"?>
+<root>
+	<item>$data</item>
+</root>
