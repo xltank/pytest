@@ -6,6 +6,7 @@ Created on 2013-1-20
 
 
 import web
+import hashlib
 
 render = web.template.render('templates/')
 urls = (
@@ -18,13 +19,13 @@ urls = (
 
 app = web.application(urls, globals())
 
-db = web.database(dbn = 'mysql', user = 'root', pw = 'root', db = 'test')
+db = web.database(dbn='mysql', user='root', pw='root', db='test')
 
 
 class index:
     def GET(self):
         return render.index()
-    
+
 class login:
     def GET(self):
         return render.login()
@@ -32,7 +33,8 @@ class login:
     def POST(self):
         f = web.input()
         if(f.name and f.password):
-            r = db.query("select * from user where name=$name and password=$password", vars = dict(f))
+            f.password = hashlib.md5(f.password).hexdigest()
+            r = db.query("select * from user where name=$name and password=$password", vars=dict(f))
         if(len(r) > 0):
             web.seeother('/userlist')
         else:
@@ -55,7 +57,8 @@ class signup:
     def POST(self):
         i = web.input()
         if(i.name and i.password and i.password == i.confirm):
-            db.insert('user', name = i.name, password = i.password, description = i.description)
+            pswdHash = hashlib.md5(i.password).hexdigest()
+            db.insert('user', name=i.name, password=pswdHash, description=i.description)
         raise web.seeother('/signup')
 
 
