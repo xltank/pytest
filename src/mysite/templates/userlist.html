@@ -1,8 +1,13 @@
-$def with(users)
+$def with(users, files)
 <html>
 	<head>
 		<title>This is a test homepage.</title>
 	</head>
+	
+	<form method="post" enctype="multipart/form-data" action="upload">
+		<input type="file" name="file"></input>
+		<input type="submit" value="upload"></input>
+	</form>
 	
 	<body>
 		<input type="button" value="Log out" onclick="location.href='logout'">
@@ -20,6 +25,19 @@ $def with(users)
 				<td>$u.description</td>
 			</tr>
 		</table>
+		<p/>
+		<table border="1">
+			<tr>
+				<th>ID</th>
+				<th>Name</th>
+			</tr>
+			$for f in files:
+			<tr>
+				<td>$f.id</td>
+				<td>$f.name</td>
+			</tr>
+		</table>
+		
 	</body>
 
 </html>
