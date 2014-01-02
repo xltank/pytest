@@ -35,7 +35,6 @@ ses = Session(app, DiskStore('sessions'), initializer={'userName':'', 'userId':'
 
 uploadDir = 'upload'
 
-
 def checkToken():
     un = web.cookies().get('userName')
     tk = web.cookies().get('token')
